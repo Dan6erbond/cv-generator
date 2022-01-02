@@ -153,5 +153,7 @@ cython_debug/
 
 # Custom
 __cache__/
-assets/
-cv.pdf
+assets/Source_Sans_Pro/
+assets/cv.json
+assets/ravi_2_1_cropped_1.png
+*.pdf
