@@ -1,7 +1,8 @@
 import json
 import os
+from typing import overload
 
-from reportlab.lib import pagesizes, units, styles, colors
+from reportlab.lib import colors, pagesizes, styles, units
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas, textobject
 from reportlab.platypus import Paragraph
@@ -10,16 +11,28 @@ from .graphics.crop_to_circle import crop_to_circle
 from .util.i18n import resolve_string
 
 
-def write_small_caps(
-    text_object: textobject.PDFTextObject, text: str, face_name: str, font_size: int
+@overload
+def write_text(
+    text_object: textobject.TextObject,
+    text: str,
+    face_name: str,
+    size: int,
+    max_width: int,
+    style: dict = None,
 ):
-    for char in text:
-        if char.upper() == char:
-            text_object.setFont(face_name, font_size)
-            text_object.textOut(char)
-        else:
-            text_object.setFont(face_name, font_size * 0.8)
-            text_object.textOut(char.upper())
+    ...
+
+
+@overload
+def write_text(
+    text_object: textobject.TextObject,
+    text: str,
+    face_name: str,
+    size: int,
+    end_right: int,
+    style: dict = None,
+):
+    ...
 
 
 def write_text(
@@ -40,24 +53,44 @@ def write_text(
 
     text_object.setFont(face_name, font_size)
 
-    lines = list()
     space_width = pdfmetrics.stringWidth(
         " ", text_object._fontname, text_object._fontsize
     )
     for line in text.splitlines():
         if not line:
-            lines.append("")
+            text_object.textLine("")
         else:
             words = list()
             width = 0
             for word in line.split(" "):
-                word_width = pdfmetrics.stringWidth(
-                    word, text_object._fontname, text_object._fontsize
-                )
+                if style.get("small-caps", False):
+                    word_width = 0
+                    for char in word:
+                        if char == char.upper():
+                            word_width += pdfmetrics.stringWidth(
+                                char, text_object._fontname, text_object._fontsize
+                            )
+                        else:
+                            word_width += pdfmetrics.stringWidth(
+                                char, text_object._fontname, text_object._fontsize * 0.8
+                            )
+                else:
+                    word_width = pdfmetrics.stringWidth(
+                        word, text_object._fontname, text_object._fontsize
+                    )
 
                 if width + word_width >= max_width:
                     l = " ".join(words)
-                    lines.append(l)
+                    if style.get("small-caps", False):
+                        for char in l:
+                            if char.upper() == char:
+                                text_object.setFont(face_name, font_size)
+                                text_object.textOut(char)
+                            else:
+                                text_object.setFont(face_name, font_size * 0.8)
+                                text_object.textOut(char.upper())
+                    else:
+                        text_object.textLine(l)
                     words = list()
                     width = 0
 
@@ -65,9 +98,16 @@ def write_text(
                 width += word_width + space_width
             if words:
                 l = " ".join(words)
-                lines.append(l)
-
-    text_object.textLines(lines)
+                if style.get("small-caps", False):
+                    for char in l:
+                        if char.upper() == char:
+                            text_object.setFont(face_name, font_size)
+                            text_object.textOut(char)
+                        else:
+                            text_object.setFont(face_name, font_size * 0.8)
+                            text_object.textOut(char.upper())
+                else:
+                    text_object.textLine(l)
 
     height = start_y - text_object.getY()
     return max_width, height
@@ -121,7 +161,14 @@ def draw_left(
         pagesizes.A4[1] - y_pos - 0.5 * units.cm,
     )
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
-    write_small_caps(profile_title, "Profile", face_name, 22)
+    write_text(
+        profile_title,
+        "Profile",
+        face_name,
+        22,
+        max_width=7 * units.cm,
+        style={"small-caps": True},
+    )
     doc.drawText(profile_title)
 
     summary_text = doc.beginText(
@@ -165,7 +212,14 @@ def draw_left(
         pagesizes.A4[1] - y_pos - 0.5 * units.cm,
     )
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
-    write_small_caps(profile_title, "Contact", face_name, 22)
+    write_text(
+        profile_title,
+        "Contact",
+        face_name,
+        22,
+        max_width=7 * units.cm,
+        style={"small-caps": True},
+    )
     doc.drawText(profile_title)
 
     paragraph = Paragraph(
@@ -213,7 +267,14 @@ def draw_left(
         pagesizes.A4[1] - y_pos + 0.5 * units.cm,
     )
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
-    write_small_caps(profile_title, "Languages", face_name, 22)
+    write_text(
+        profile_title,
+        "Languages",
+        face_name,
+        22,
+        max_width=7 * units.cm,
+        style={"small-caps": True},
+    )
     doc.drawText(profile_title)
 
     summary_text = doc.beginText(
@@ -255,9 +316,23 @@ def draw_right(
         pagesizes.A4[1] - 2.5 * units.cm,
     )
     name_text.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
-    write_small_caps(name_text, data["name"]["first"], face_name, 34)
+    write_text(
+        name_text,
+        data["name"]["first"],
+        face_name,
+        34,
+        max_width=7 * units.cm,
+        style={"small-caps": True},
+    )
     name_text.textOut(" ")
-    write_small_caps(name_text, data["name"]["last"], face_name, 34)
+    write_text(
+        name_text,
+        data["name"]["last"],
+        face_name,
+        34,
+        max_width=7 * units.cm,
+        style={"small-caps": True},
+    )
     doc.drawText(name_text)
 
     headline_text = doc.beginText(
