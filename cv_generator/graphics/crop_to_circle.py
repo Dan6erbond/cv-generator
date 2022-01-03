@@ -5,6 +5,12 @@ from PIL import Image, ImageDraw, ImageOps
 
 
 def crop_to_circle(file, size=None, bg_color=(255, 255, 255)):
+    path = os.path.join(
+        "__cache__",
+        "images",
+        (os.path.splitext(os.path.basename(file))[0] + "_circle.png"),
+    )
+
     _img = Image.open(file)
     if _img.mode == "RGBA":
         img = Image.new("RGBA", _img.size, bg_color)
@@ -23,13 +29,7 @@ def crop_to_circle(file, size=None, bg_color=(255, 255, 255)):
     output = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
     output.putalpha(mask)
 
-    output.save(
-        path := os.path.join(
-            "__cache__",
-            "images",
-            (os.path.splitext(os.path.basename(file))[0] + "_circle.png"),
-        )
-    )
+    output.save(path)
     return path
 
 
