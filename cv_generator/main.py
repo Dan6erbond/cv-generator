@@ -8,7 +8,7 @@ from reportlab.pdfgen import canvas, textobject
 from reportlab.platypus import Paragraph
 
 from .graphics.crop_to_circle import crop_to_circle
-from .util.i18n import resolve_string
+from .util.i18n import resolve_string, strings
 
 
 @overload
@@ -69,20 +69,20 @@ def write_text(
                     for char in word:
                         if char == char.upper():
                             word_width += pdfmetrics.stringWidth(
-                                char, text_object._fontname, text_object._fontsize
+                                char, face_name, font_size
                             )
                         else:
                             word_width += pdfmetrics.stringWidth(
-                                char, text_object._fontname, text_object._fontsize * 0.8
+                                char, face_name, font_size * 0.8
                             )
-                        word_width += (
-                            getattr(
-                                text_object,
-                                "_charSpace",
-                                text_object._canvas._charSpace,
-                            )
-                            or 1.5
+                    word_width += (
+                        getattr(
+                            text_object,
+                            "_charSpace",
+                            text_object._canvas._charSpace,
                         )
+                        or 1.25
+                    ) * len(word) - 1
                 else:
                     word_width = pdfmetrics.stringWidth(
                         word, text_object._fontname, text_object._fontsize
@@ -179,7 +179,7 @@ def draw_left(
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
     write_text(
         profile_title,
-        "Profile",
+        resolve_string(strings["profile"], lang),
         face_name,
         22,
         max_width=7 * units.cm,
@@ -230,7 +230,7 @@ def draw_left(
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
     write_text(
         profile_title,
-        "Contact",
+        resolve_string(strings["contact"], lang),
         face_name,
         22,
         max_width=7 * units.cm,
@@ -285,7 +285,7 @@ def draw_left(
     profile_title.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
     write_text(
         profile_title,
-        "Languages",
+        resolve_string(strings["languages"], lang),
         face_name,
         22,
         max_width=7 * units.cm,
@@ -373,16 +373,83 @@ def draw_right(
     doc.setStrokeColorRGB(0 / 255, 0 / 255, 0 / 255)
     doc.setLineWidth(1)
 
-    y = y_pos - 0.5 * units.cm - 32
+    y = y_pos - 0.5 * units.cm - 28
     education_title = doc.beginText(
         8.5 * units.cm,
         y,
     )
     width, _ = write_text(
         education_title,
-        "Education",
+        resolve_string(strings["experience"], lang),
         face_name,
-        32,
+        28,
+        max_width=8 * units.cm,
+        style={"small-caps": True},
+    )
+    doc.drawText(education_title)
+    doc.line(
+        8.5 * units.cm, y - 0.25 * units.cm, 8.5 * units.cm + width, y - 0.25 * units.cm
+    )
+
+    y_pos = y - 0.25 * units.cm
+
+    for entry in data["experience"]:
+        y = y_pos - 0.25 * units.cm - 20
+        entry_title = doc.beginText(8.5 * units.cm, y)
+        write_text(
+            entry_title,
+            resolve_string(entry["company"], lang),
+            face_name,
+            20,
+            max_width=pagesizes.A4[0] - 8 * units.cm - 1 * units.cm,
+            style={"small-caps": True},
+        )
+        doc.drawText(entry_title)
+        y_pos = y
+
+        y = y_pos - 0.25 * units.cm - 11
+        entry_field = doc.beginText(8.5 * units.cm, y)
+        entry_field.setFont(face_name, 11)
+        date = (
+            resolve_string(entry["start"], lang)
+            if "end" not in entry
+            else f"{resolve_string(entry['start'], lang)} - {resolve_string(entry['end'], lang)}"
+        )
+        entry_field.textOut(f"{resolve_string(entry['position'], lang)} | {date}")
+        doc.drawText(entry_field)
+        y_pos = y
+
+        y_pos -= 0.2 * units.cm
+        for task in entry["tasks"]:
+            paragraph = Paragraph(
+                resolve_string(task, lang).replace("\n", "<br/>"),
+                bulletText="•",
+                style=styles.ParagraphStyle(
+                    "education-list",
+                    fontName=face_name,
+                    fontSize=12,
+                    textColor=colors.black,
+                    bulletIndent=10,
+                    leftIndent=20,
+                    leading=14,
+                ),
+            )
+            paragraph.wrapOn(doc, pagesizes.A4[0] - 8.5 * units.cm - 1 * units.cm, 0)
+            paragraph.drawOn(
+                doc, 8.5 * units.cm, y_pos - 0.2 * units.cm - paragraph.height
+            )
+            y_pos -= 0.2 * units.cm + paragraph.height
+
+    y = y_pos - 0.5 * units.cm - 28
+    education_title = doc.beginText(
+        8.5 * units.cm,
+        y,
+    )
+    width, _ = write_text(
+        education_title,
+        resolve_string(strings["education"], lang),
+        face_name,
+        28,
         max_width=8 * units.cm,
         style={"small-caps": True},
     )
@@ -394,7 +461,7 @@ def draw_right(
     y_pos = y - 0.25 * units.cm
 
     for entry in data["education"]:
-        y = y_pos - 0.5 * units.cm - 20
+        y = y_pos - 0.25 * units.cm - 20
         entry_title = doc.beginText(8.5 * units.cm, y)
         write_text(
             entry_title,
@@ -419,7 +486,8 @@ def draw_right(
         doc.drawText(entry_field)
         y_pos = y
 
-        for idx, task in enumerate(entry["tasks"]):
+        y_pos -= 0.2 * units.cm
+        for task in entry["tasks"]:
             paragraph = Paragraph(
                 resolve_string(task, lang).replace("\n", "<br/>"),
                 bulletText="•",
@@ -435,9 +503,10 @@ def draw_right(
             )
             paragraph.wrapOn(doc, pagesizes.A4[0] - 8.5 * units.cm - 1 * units.cm, 0)
             paragraph.drawOn(
-                doc, 8.5 * units.cm, y_pos - 0.4 * units.cm - paragraph.height
+                doc, 8.5 * units.cm, y_pos - 0.2 * units.cm - paragraph.height
             )
-            y_pos -= paragraph.height
+            y_pos -= 0.2 * units.cm + paragraph.height
+
 
 def generate_cv(data_path: str, font: str, lang: str = "en"):
     data = json.load(open(data_path))
