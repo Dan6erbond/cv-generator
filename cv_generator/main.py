@@ -419,7 +419,6 @@ def draw_right(
         doc.drawText(entry_field)
         y_pos = y
 
-        y_pos -= 0.2 * units.cm
         for idx, task in enumerate(entry["tasks"]):
             paragraph = Paragraph(
                 resolve_string(task, lang).replace("\n", "<br/>"),
@@ -436,11 +435,9 @@ def draw_right(
             )
             paragraph.wrapOn(doc, pagesizes.A4[0] - 8.5 * units.cm - 1 * units.cm, 0)
             paragraph.drawOn(
-                doc, 8.5 * units.cm, y_pos - 0.2 * units.cm - paragraph.height
+                doc, 8.5 * units.cm, y_pos - 0.4 * units.cm - paragraph.height
             )
             y_pos -= paragraph.height
-            if idx != len(entry["tasks"]) - 1:
-                y_pos -= 0.2 * units.cm
 
 def generate_cv(data_path: str, font: str, lang: str = "en"):
     data = json.load(open(data_path))
