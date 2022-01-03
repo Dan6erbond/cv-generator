@@ -127,7 +127,12 @@ def write_text(
 
 
 def draw_left(
-    doc: canvas.Canvas, data: dict, data_path: str, face_name: str, lang: str
+    doc: canvas.Canvas,
+    data: dict,
+    data_path: str,
+    face_name: str,
+    lang: str,
+    include_watermark: bool = True,
 ):
     y_pos = 0
 
@@ -307,6 +312,11 @@ def draw_left(
     doc.drawText(summary_text)
 
     y_pos += height
+
+    if include_watermark:
+        watermark = doc.beginText(0.5 * units.cm, 0.75 * units.cm)
+        watermark.textOut(resolve_string(strings["watermark"], lang))
+        doc.drawText(watermark)
 
 
 def draw_right(
@@ -508,15 +518,28 @@ def draw_right(
             y_pos -= 0.2 * units.cm + paragraph.height
 
 
-def generate_cv(data_path: str, font: str, lang: str = "en"):
+def generate_cv(
+    data_path: str,
+    font: str,
+    lang: str = "en",
+    title: str = None,
+    filename: str = None,
+    output_path: str = "./",
+    include_watermark: bool = True,
+):
     data = json.load(open(data_path))
     print("Loaded data for:", data["name"]["first"])
 
     print("Generating CV...")
 
-    title = f"CV_{data['name']['first']}_{data['name']['last']}"
-    filename = f"{title}.pdf"
-    doc = canvas.Canvas(filename=filename, pagesize=pagesizes.A4)
+    if not title:
+        title = f"CV_{data['name']['first']}_{data['name']['last']}"
+    if not filename:
+        filename = f"{title}.pdf"
+    doc = canvas.Canvas(
+        filename=os.path.abspath(os.path.join(output_path, filename)),
+        pagesize=pagesizes.A4,
+    )
     doc.setTitle(title)
 
     afm_file, pfb_file = font
@@ -530,9 +553,11 @@ def generate_cv(data_path: str, font: str, lang: str = "en"):
     pdfmetrics.registerFont(just_font)
     doc.setFont(face_name, 32)
 
-    draw_left(doc, data, data_path, face_name, lang)
+    draw_left(doc, data, data_path, face_name, lang, include_watermark)
     draw_right(doc, data, data_path, face_name, lang)
 
     doc.save()
 
     print(f"File saved at: ./{filename}")
+
+    return filename
