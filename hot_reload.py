@@ -24,7 +24,7 @@ if __name__ == "__main__":
             open(os.path.join(dir_path, ".gitignore")),
         )
 
-    last_mtime = os.stat(file_path).st_mtime
+    last_mtime: float = None
     while True:
         should_reload = False
         for root, dirs, files in os.walk(dir_path):
@@ -38,7 +38,10 @@ if __name__ == "__main__":
                 if spec and spec.match_file(os.path.relpath(os.path.join(root, f), dir_path)):
                     continue
                 mtime = os.stat(os.path.join(root, f)).st_mtime
-                if mtime > last_mtime:
+                if not mtime:
+                    last_mtime = mtime
+                    should_reload = True
+                elif mtime > last_mtime:
                     print("Reloading:", f)
                     last_mtime = mtime
                     should_reload = True
