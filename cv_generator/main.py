@@ -13,25 +13,25 @@ from .util.i18n import resolve_string
 
 @overload
 def write_text(
-    text_object: textobject.TextObject,
+    text_object: textobject.PDFTextObject,
     text: str,
     face_name: str,
     size: int,
     max_width: int,
     style: dict = None,
-):
+) -> tuple[int, int]:
     ...
 
 
 @overload
 def write_text(
-    text_object: textobject.TextObject,
+    text_object: textobject.PDFTextObject,
     text: str,
     face_name: str,
     size: int,
     end_right: int,
     style: dict = None,
-):
+) -> tuple[int, int]:
     ...
 
 
@@ -56,6 +56,7 @@ def write_text(
     space_width = pdfmetrics.stringWidth(
         " ", text_object._fontname, text_object._fontsize
     )
+    max_line_width = 0
     for line in text.splitlines():
         if not line:
             text_object.textLine("")
@@ -74,6 +75,14 @@ def write_text(
                             word_width += pdfmetrics.stringWidth(
                                 char, text_object._fontname, text_object._fontsize * 0.8
                             )
+                        word_width += (
+                            getattr(
+                                text_object,
+                                "_charSpace",
+                                text_object._canvas._charSpace,
+                            )
+                            or 1.5
+                        )
                 else:
                     word_width = pdfmetrics.stringWidth(
                         word, text_object._fontname, text_object._fontsize
@@ -92,6 +101,8 @@ def write_text(
                     else:
                         text_object.textLine(l)
                     words = list()
+                    if width >= max_line_width:
+                        max_line_width = width
                     width = 0
 
                 words.append(word)
@@ -108,15 +119,20 @@ def write_text(
                             text_object.textOut(char.upper())
                 else:
                     text_object.textLine(l)
+                if width >= max_line_width:
+                    max_line_width = width
 
     height = start_y - text_object.getY()
-    return max_width, height
+    return max_line_width, height
 
 
 def draw_left(
     doc: canvas.Canvas, data: dict, data_path: str, face_name: str, lang: str
 ):
     y_pos = 0
+
+    def draw_cursor():
+        doc.line(0, y_pos, 8 * units.cm, y_pos)
 
     doc.setStrokeColorRGB(167 / 255, 174 / 255, 177 / 255)
     doc.setFillColorRGB(167 / 255, 174 / 255, 177 / 255)
@@ -298,30 +314,34 @@ def draw_right(
 ):
     y_pos = 0
 
+    def draw_cursor():
+        doc.line(8 * units.cm, y_pos, pagesizes.A4[0], y_pos)
+
     doc.setStrokeColorRGB(42 / 255, 56 / 255, 72 / 255)
     doc.setFillColorRGB(42 / 255, 56 / 255, 72 / 255)
     y = pagesizes.A4[1] - 3.5 * units.cm - 1 * units.cm
+    name_rect_width = pagesizes.A4[0] - 8 * units.cm - 1 * units.cm
     doc.rect(
         8 * units.cm,
         y,
-        pagesizes.A4[0] - 8 * units.cm - 1 * units.cm,
+        name_rect_width,
         3.5 * units.cm,
         fill=1,
     )
 
-    y_pos += y
+    y_pos = y
 
     name_text = doc.beginText(
         8.5 * units.cm,
         pagesizes.A4[1] - 2.5 * units.cm,
     )
     name_text.setFillColorRGB(255 / 255, 255 / 255, 255 / 255)
-    write_text(
+    name_text_width, _ = write_text(
         name_text,
         data["name"]["first"],
         face_name,
         34,
-        max_width=7 * units.cm,
+        max_width=name_rect_width - 1 * units.cm,
         style={"small-caps": True},
     )
     name_text.textOut(" ")
@@ -330,7 +350,7 @@ def draw_right(
         data["name"]["last"],
         face_name,
         34,
-        max_width=7 * units.cm,
+        max_width=name_rect_width - 1 * units.cm - name_text_width,
         style={"small-caps": True},
     )
     doc.drawText(name_text)
@@ -339,11 +359,88 @@ def draw_right(
         8.5 * units.cm,
         pagesizes.A4[1] - 3.75 * units.cm,
     )
-    headline_text.setFont(face_name, 22)
     headline_text.setFillColorRGB(210 / 255, 210 / 255, 210 / 255)
-    headline_text.textOut(resolve_string(data["headline"], lang))
+    write_text(
+        headline_text,
+        resolve_string(data["headline"], lang),
+        face_name,
+        22,
+        max_width=name_rect_width - 1 * units.cm,
+    )
     doc.drawText(headline_text)
 
+    doc.setFillColorRGB(0 / 255, 0 / 255, 0 / 255)
+    doc.setStrokeColorRGB(0 / 255, 0 / 255, 0 / 255)
+    doc.setLineWidth(1)
+
+    y = y_pos - 0.5 * units.cm - 32
+    education_title = doc.beginText(
+        8.5 * units.cm,
+        y,
+    )
+    width, _ = write_text(
+        education_title,
+        "Education",
+        face_name,
+        32,
+        max_width=8 * units.cm,
+        style={"small-caps": True},
+    )
+    doc.drawText(education_title)
+    doc.line(
+        8.5 * units.cm, y - 0.25 * units.cm, 8.5 * units.cm + width, y - 0.25 * units.cm
+    )
+
+    y_pos = y - 0.25 * units.cm
+
+    for entry in data["education"]:
+        y = y_pos - 0.5 * units.cm - 20
+        entry_title = doc.beginText(8.5 * units.cm, y)
+        write_text(
+            entry_title,
+            resolve_string(entry["institution"], lang),
+            face_name,
+            20,
+            max_width=pagesizes.A4[0] - 8 * units.cm - 1 * units.cm,
+            style={"small-caps": True},
+        )
+        doc.drawText(entry_title)
+        y_pos = y
+
+        y = y_pos - 0.25 * units.cm - 11
+        entry_field = doc.beginText(8.5 * units.cm, y)
+        entry_field.setFont(face_name, 11)
+        date = (
+            resolve_string(entry["start"], lang)
+            if "end" not in entry
+            else f"{resolve_string(entry['start'], lang)} - {resolve_string(entry['end'], lang)}"
+        )
+        entry_field.textOut(f"{resolve_string(entry['field'], lang)} | {date}")
+        doc.drawText(entry_field)
+        y_pos = y
+
+        y_pos -= 0.2 * units.cm
+        for idx, task in enumerate(entry["tasks"]):
+            paragraph = Paragraph(
+                resolve_string(task, lang).replace("\n", "<br/>"),
+                bulletText="•",
+                style=styles.ParagraphStyle(
+                    "education-list",
+                    fontName=face_name,
+                    fontSize=12,
+                    textColor=colors.black,
+                    bulletIndent=10,
+                    leftIndent=20,
+                    leading=14,
+                ),
+            )
+            paragraph.wrapOn(doc, pagesizes.A4[0] - 8.5 * units.cm - 1 * units.cm, 0)
+            paragraph.drawOn(
+                doc, 8.5 * units.cm, y_pos - 0.2 * units.cm - paragraph.height
+            )
+            y_pos -= paragraph.height
+            if idx != len(entry["tasks"]) - 1:
+                y_pos -= 0.2 * units.cm
 
 def generate_cv(data_path: str, font: str, lang: str = "en"):
     data = json.load(open(data_path))
@@ -372,4 +469,4 @@ def generate_cv(data_path: str, font: str, lang: str = "en"):
 
     doc.save()
 
-    print(f"File saved at: ./{filename}.pdf")
+    print(f"File saved at: ./{filename}")
