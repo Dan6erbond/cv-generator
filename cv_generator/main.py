@@ -315,7 +315,14 @@ def draw_left(
 
     if include_watermark:
         watermark = doc.beginText(0.5 * units.cm, 0.75 * units.cm)
-        watermark.textOut(resolve_string(strings["watermark"], lang))
+        watermark.setFillColorRGB(0 / 255, 0 / 255, 0 / 255)
+        write_text(
+            watermark,
+            resolve_string(strings["watermark"], lang),
+            face_name,
+            9,
+            6 * units.cm,
+        )
         doc.drawText(watermark)
 
 
