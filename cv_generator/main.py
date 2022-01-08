@@ -1,6 +1,7 @@
 import json
 import os
 from typing import overload
+from datetime import datetime
 
 from reportlab.lib import colors, pagesizes, styles, units
 from reportlab.pdfbase import pdfmetrics
@@ -81,7 +82,7 @@ def write_text(
                             "_charSpace",
                             text_object._canvas._charSpace,
                         )
-                        or 1.25
+                        or font_size * 0.08
                     ) * len(word) - 1
                 else:
                     word_width = pdfmetrics.stringWidth(
@@ -243,10 +244,19 @@ def draw_left(
     )
     doc.drawText(profile_title)
 
+    contact_addresses = list()
+
+    if data.get("phone"):
+        contact_addresses.append(data["phone"])
+    if data.get("email"):
+        contact_addresses.append(data["email"])
+    if data.get("website"):
+        contact_addresses.append(data["website"])
+
     paragraph = Paragraph(
-        f"""<u>{data['phone']}</u>
-                          <br/><br/>
-                          <u>{data['email']}</u>""",
+        "<br/><br/>".join(
+            f"<u>{contact_address}</u>" for contact_address in contact_addresses
+        ),
         style=styles.ParagraphStyle(
             "contact",
             fontName=face_name,
@@ -298,20 +308,31 @@ def draw_left(
     )
     doc.drawText(profile_title)
 
-    summary_text = doc.beginText(
-        0.5 * units.cm,
-        pagesizes.A4[1] - y_pos - 0.75 * units.cm,
-    )
-    _, height = write_text(
-        summary_text,
-        resolve_string(data["summary"], lang),
-        face_name,
-        14,
-        end_right=6.75 * units.cm,
-    )
-    doc.drawText(summary_text)
-
-    y_pos += height
+    for language in data["languages"]:
+        paragraph = Paragraph(
+            f"{resolve_string(strings['language_codes'][language['language']], lang)}: {resolve_string(strings['language_level'][language['fluency']], lang)}".replace(
+                "\n", "<br/>"
+            ).replace(
+                "/", " / "
+            ),
+            bulletText="•",
+            style=styles.ParagraphStyle(
+                "language-list",
+                fontName=face_name,
+                fontSize=14,
+                textColor=colors.white,
+                bulletIndent=10,
+                leftIndent=20,
+                leading=14,
+            ),
+        )
+        paragraph.wrapOn(doc, 6.5 * units.cm, 0)
+        paragraph.drawOn(
+            doc,
+            0.5 * units.cm,
+            pagesizes.A4[1] - y_pos - 0.2 * units.cm - paragraph.height,
+        )
+        y_pos += 0.2 * units.cm + paragraph.height
 
     if include_watermark:
         watermark = doc.beginText(0.5 * units.cm, 0.75 * units.cm)
@@ -381,7 +402,7 @@ def draw_right(
         headline_text,
         resolve_string(data["headline"], lang),
         face_name,
-        22,
+        20,
         max_width=name_rect_width - 1 * units.cm,
     )
     doc.drawText(headline_text)
@@ -443,6 +464,41 @@ def draw_right(
                 bulletText="•",
                 style=styles.ParagraphStyle(
                     "education-list",
+                    fontName=face_name,
+                    fontSize=12,
+                    textColor=colors.black,
+                    bulletIndent=10,
+                    leftIndent=20,
+                    leading=14,
+                ),
+            )
+            paragraph.wrapOn(doc, pagesizes.A4[0] - 8.5 * units.cm - 1 * units.cm, 0)
+            paragraph.drawOn(
+                doc, 8.5 * units.cm, y_pos - 0.2 * units.cm - paragraph.height
+            )
+            y_pos -= 0.2 * units.cm + paragraph.height
+
+    if data["projects"]:
+        y = y_pos - 0.25 * units.cm - 20
+        entry_title = doc.beginText(8.5 * units.cm, y)
+        write_text(
+            entry_title,
+            resolve_string(strings["projects"], lang),
+            face_name,
+            20,
+            max_width=pagesizes.A4[0] - 8 * units.cm - 1 * units.cm,
+            style={"small-caps": True},
+        )
+        doc.drawText(entry_title)
+        y_pos = y
+
+        y_pos -= 0.2 * units.cm
+        for project in data["projects"]:
+            paragraph = Paragraph(
+                resolve_string(project["description"], lang).replace("\n", "<br/>"),
+                bulletText="•",
+                style=styles.ParagraphStyle(
+                    "projects-list",
                     fontName=face_name,
                     fontSize=12,
                     textColor=colors.black,
@@ -527,14 +583,14 @@ def draw_right(
 
 def generate_cv(
     data_path: str,
-    font: str,
+    font: tuple[str, str],
     lang: str = "en",
     title: str = None,
     filename: str = None,
     output_path: str = "./",
     include_watermark: bool = True,
 ):
-    data = json.load(open(data_path))
+    data = json.load(open(data_path, encoding="utf8"))
     print("Loaded data for:", data["name"]["first"])
 
     print("Generating CV...")
@@ -542,7 +598,19 @@ def generate_cv(
     if not title:
         title = f"CV_{data['name']['first']}_{data['name']['last']}"
     if not filename:
-        filename = f"{title}.pdf"
+        today = datetime.today()
+        if data.get("filename", None):
+            filename = data["filename"].format(
+                title=title,
+                firstname=data["name"]["first"],
+                lastname=data["name"]["first"],
+                date=today.strftime("%Y-%m-%d"),
+                lang=lang,
+            )
+        else:
+            filename = (
+                f"{today.year}_{today.month:02d}_{today.day:02d}_{title}_{lang}.pdf"
+            )
     doc = canvas.Canvas(
         filename=os.path.abspath(os.path.join(output_path, filename)),
         pagesize=pagesizes.A4,

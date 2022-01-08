@@ -20,4 +20,5 @@ if __name__ == "__main__":
     generate_cv(
         os.path.join("assets", "cv.json"),
         ("SourceSansPro-Regular.afm", "SourceSansPro-Regular.pfb"),
+        "de",
     )

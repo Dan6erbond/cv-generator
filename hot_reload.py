@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 if spec and spec.match_file(os.path.relpath(os.path.join(root, f), dir_path)):
                     continue
                 mtime = os.stat(os.path.join(root, f)).st_mtime
-                if not mtime:
+                if last_mtime is None:
                     last_mtime = mtime
                     should_reload = True
                 elif mtime > last_mtime:
