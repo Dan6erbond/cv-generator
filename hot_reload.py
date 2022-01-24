@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     spec: pathspec.PathSpec = None
 
-    ignore_file = ".gitignore"
+    ignore_file = ".cvignore" if os.path.exists(os.path.join(dir_path, ".cvignore")) else ".gitignore"
     for idx, arg in enumerate(args):
         if arg.startswith("--ignore-file="):
             ignore_file = "=".join(arg.split("=")[1:])
