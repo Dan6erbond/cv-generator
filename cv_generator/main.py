@@ -595,10 +595,18 @@ def generate_cv(
 
     print("Generating CV...")
 
+    today = datetime.today()
     if not title:
-        title = f"CV_{data['name']['first']}_{data['name']['last']}"
+        if data.get("title", None):
+            title = data["title"].format(
+                firstname=data["name"]["first"],
+                lastname=data["name"]["first"],
+                date=today.strftime("%Y-%m-%d"),
+                lang=lang,
+            )
+        else:
+            title = f"CV_{data['name']['first']}_{data['name']['last']}"
     if not filename:
-        today = datetime.today()
         if data.get("filename", None):
             filename = data["filename"].format(
                 title=title,
