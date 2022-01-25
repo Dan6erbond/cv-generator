@@ -40,8 +40,8 @@ strings = {
         },
     },
     "projects": {
-        "en": "Projects",
-        "de": "Projekte",
+        "en": "Skills & Projects",
+        "de": "Skills & Projekte",
     },
 }
 
